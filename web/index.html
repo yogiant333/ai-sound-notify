@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Sound Notify</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-card: #1e2a47;
+    --bg-elevated: #243352;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border-color: #2d3f5f;
+    --claude-color: #8b5cf6;
+    --gemini-color: #3b82f6;
+    --codex-color: #10b981;
+    --event-complete: #22c55e;
+    --event-input: #f59e0b;
+    --danger: #ef4444;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+
+  .header-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    background: linear-gradient(135deg, var(--claude-color), var(--gemini-color), var(--codex-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .status-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--danger);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+
+  .status-dot.connected {
+    background: var(--event-complete);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+
+  .volume-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .volume-group label { white-space: nowrap; }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-color);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-mute {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-mute:hover { background: var(--border-color); }
+  .btn-mute.muted { background: var(--danger); border-color: var(--danger); }
+
+  /* ── Main layout ────────────────────────────────────── */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── Source cards ────────────────────────────────────── */
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--card-accent);
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    border-color: var(--card-accent);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .card-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--card-accent);
+  }
+
+  /* Toggle switch */
+  .toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+  }
+
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border-color);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: background 0.25s;
+  }
+
+  .toggle-slider::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    transition: transform 0.25s;
+  }
+
+  .toggle input:checked + .toggle-slider {
+    background: var(--card-accent);
+  }
+
+  .toggle input:checked + .toggle-slider::after {
+    transform: translateX(18px);
+  }
+
+  .card-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-test {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .btn-test:hover {
+    background: var(--card-accent);
+    color: #fff;
+    border-color: var(--card-accent);
+  }
+
+  .btn-test:active {
+    transform: scale(0.97);
+  }
+
+  /* ── History ────────────────────────────────────────── */
+  .history-section { margin-top: 8px; }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .history-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px 16px;
+    font-size: 0.85rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+  }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    animation: slideIn 0.3s ease-out;
+    flex-wrap: wrap;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .history-time {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    white-space: nowrap;
+    min-width: 58px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+
+  .badge-source {
+    color: #fff;
+  }
+
+  .badge-source.claude-code { background: var(--claude-color); }
+  .badge-source.gemini { background: var(--gemini-color); }
+  .badge-source.codex { background: var(--codex-color); }
+
+  .badge-event.task_complete {
+    background: rgba(34,197,94,0.15);
+    color: var(--event-complete);
+    border: 1px solid rgba(34,197,94,0.3);
+  }
+
+  .badge-event.need_input {
+    background: rgba(245,158,11,0.15);
+    color: var(--event-input);
+    border: 1px solid rgba(245,158,11,0.3);
+  }
+
+  .history-message {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Responsive ─────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .header { padding: 12px 16px; }
+    .container { padding: 16px; }
+    .cards-row { grid-template-columns: 1fr; }
+    .header-controls { margin-left: 0; width: 100%; justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────── -->
+<header class="header">
+  <span class="header-title">AI Sound Notify</span>
+  <div class="status-group">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Disconnected</span>
+  </div>
+  <div class="header-controls">
+    <div class="volume-group">
+      <label for="volumeSlider">Vol</label>
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.6">
+    </div>
+    <button class="btn-mute" id="muteBtn" type="button">Mute All</button>
+  </div>
+</header>
+
+<!-- ── Main ────────────────────────────────────────────── -->
+<div class="container">
+
+  <p class="section-label">Sources</p>
+  <div class="cards-row">
+
+    <div class="card" style="--card-accent: var(--claude-color);">
+      <div class="card-header">
+        <span class="card-name">Claude Code</span>
+        <label class="toggle">
+          <input type="checkbox" checked data-source="claude-code">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="card-buttons">
+        <button class="btn-test" data-source="claude-code" data-event="task_complete">Test Complete</button>
+        <button class="btn-test" data-source="claude-code" data-event="need_input">Test Input</button>
+      </div>
+    </div>
+
+    <div class="card" style="--card-accent: var(--gemini-color);">
+      <div class="card-header">
+        <span class="card-name">Gemini</span>
+        <label class="toggle">
+          <input type="checkbox" checked data-source="gemini">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="card-buttons">
+        <button class="btn-test" data-source="gemini" data-event="task_complete">Test Complete</button>
+        <button class="btn-test" data-source="gemini" data-event="need_input">Test Input</button>
+      </div>
+    </div>
+
+    <div class="card" style="--card-accent: var(--codex-color);">
+      <div class="card-header">
+        <span class="card-name">Codex</span>
+        <label class="toggle">
+          <input type="checkbox" checked data-source="codex">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="card-buttons">
+        <button class="btn-test" data-source="codex" data-event="task_complete">Test Complete</button>
+        <button class="btn-test" data-source="codex" data-event="need_input">Test Input</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="history-section">
+    <p class="section-label">Notification History</p>
+    <div class="history-list" id="historyList">
+      <div class="history-empty" id="historyEmpty">No notifications yet. Waiting for events...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── State ────────────────────────────────────────────
+  const history = [];
+  const MAX_HISTORY = 50;
+  let globalMuted = false;
+
+  const sourceEnabled = {
+    'claude-code': true,
+    'gemini': true,
+    'codex': true
+  };
+
+  // ── Audio context (lazy init for autoplay policy) ────
+  let audioCtx = null;
+  let gainNode = null;
+
+  function ensureAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = parseFloat(volumeSlider.value);
+      gainNode.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  // ── Frequency map ────────────────────────────────────
+  const FREQ = {
+    'claude-code': 880,
+    'gemini': 660,
+    'codex': 440
+  };
+
+  function playTaskComplete(source) {
+    ensureAudioCtx();
+    const baseFreq = FREQ[source] || 660;
+    const endFreq = baseFreq * 1.25;
+    const now = audioCtx.currentTime;
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.linearRampToValueAtTime(endFreq, now + 0.3);
+
+    const env = audioCtx.createGain();
+    env.gain.setValueAtTime(0.6, now);
+    env.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+    osc.connect(env);
+    env.connect(gainNode);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  function playNeedInput(source) {
+    ensureAudioCtx();
+    const freq = FREQ[source] || 660;
+    const now = audioCtx.currentTime;
+
+    for (let i = 0; i < 2; i++) {
+      const offset = i * 0.25; // 0.15s beep + 0.1s gap
+      const osc = audioCtx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+
+      const env = audioCtx.createGain();
+      env.gain.setValueAtTime(0, now + offset);
+      env.gain.linearRampToValueAtTime(0.6, now + offset + 0.01);
+      env.gain.setValueAtTime(0.6, now + offset + 0.14);
+      env.gain.linearRampToValueAtTime(0, now + offset + 0.15);
+
+      osc.connect(env);
+      env.connect(gainNode);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.15);
+    }
+  }
+
+  function playSound(source, event) {
+    if (globalMuted) return;
+    if (!sourceEnabled[source]) return;
+
+    if (event === 'task_complete') {
+      playTaskComplete(source);
+    } else if (event === 'need_input') {
+      playNeedInput(source);
+    }
+  }
+
+  // ── DOM refs ─────────────────────────────────────────
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const muteBtn = document.getElementById('muteBtn');
+  const historyList = document.getElementById('historyList');
+  const historyEmpty = document.getElementById('historyEmpty');
+
+  // ── Volume control ───────────────────────────────────
+  volumeSlider.addEventListener('input', function () {
+    if (gainNode) {
+      gainNode.gain.value = parseFloat(this.value);
+    }
+  });
+
+  // ── Global mute ──────────────────────────────────────
+  muteBtn.addEventListener('click', function () {
+    globalMuted = !globalMuted;
+    this.textContent = globalMuted ? 'Unmute' : 'Mute All';
+    this.classList.toggle('muted', globalMuted);
+  });
+
+  // ── Per-source toggles ───────────────────────────────
+  document.querySelectorAll('.toggle input[data-source]').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      sourceEnabled[this.dataset.source] = this.checked;
+    });
+  });
+
+  // ── Test buttons ─────────────────────────────────────
+  document.querySelectorAll('.btn-test').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const source = this.dataset.source;
+      const event = this.dataset.event;
+
+      playSound(source, event);
+
+      const notification = {
+        source: source,
+        event: event,
+        message: 'Test notification from ' + source,
+        session_id: null,
+        timestamp: new Date().toISOString()
+      };
+
+      addToHistory(notification);
+      showBrowserNotification(notification);
+    });
+  });
+
+  // ── History rendering ────────────────────────────────
+  const SOURCE_LABELS = {
+    'claude-code': 'Claude Code',
+    'gemini': 'Gemini',
+    'codex': 'Codex'
+  };
+
+  const EVENT_LABELS = {
+    'task_complete': 'Complete',
+    'need_input': 'Input'
+  };
+
+  function formatTime(isoStr) {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function addToHistory(notification) {
+    history.unshift(notification);
+    if (history.length > MAX_HISTORY) history.pop();
+
+    if (historyEmpty) historyEmpty.style.display = 'none';
+
+    const item = document.createElement('div');
+    item.className = 'history-item';
+
+    item.innerHTML =
+      '<span class="history-time">' + formatTime(notification.timestamp) + '</span>' +
+      '<span class="badge badge-source ' + notification.source + '">' + (SOURCE_LABELS[notification.source] || notification.source) + '</span>' +
+      '<span class="badge badge-event ' + notification.event + '">' + (EVENT_LABELS[notification.event] || notification.event) + '</span>' +
+      '<span class="history-message">' + escapeHtml(notification.message || '') + '</span>';
+
+    historyList.insertBefore(item, historyList.firstChild === historyEmpty ? historyEmpty.nextSibling : historyList.firstChild);
+
+    // Enforce max visible
+    while (historyList.querySelectorAll('.history-item').length > MAX_HISTORY) {
+      var items = historyList.querySelectorAll('.history-item');
+      items[items.length - 1].remove();
+    }
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
+  // ── Browser notifications ────────────────────────────
+  if ('Notification' in window) {
+    Notification.requestPermission();
+  }
+
+  function showBrowserNotification(n) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+
+    var title = (SOURCE_LABELS[n.source] || n.source) + ' - ' + (EVENT_LABELS[n.event] || n.event);
+    new Notification(title, {
+      body: n.message || 'No message',
+      tag: n.source + '-' + n.event + '-' + Date.now()
+    });
+  }
+
+  // ── WebSocket ────────────────────────────────────────
+  var ws = null;
+  var reconnectTimer = null;
+
+  function setConnected(connected) {
+    if (connected) {
+      statusDot.classList.add('connected');
+      statusText.textContent = 'Connected';
+    } else {
+      statusDot.classList.remove('connected');
+      statusText.textContent = 'Disconnected';
+    }
+  }
+
+  function connectWebSocket() {
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+
+    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(protocol + '//' + window.location.host);
+
+    ws.onopen = function () {
+      setConnected(true);
+      if (reconnectTimer) {
+        clearInterval(reconnectTimer);
+        reconnectTimer = null;
+      }
+    };
+
+    ws.onmessage = function (evt) {
+      try {
+        var notification = JSON.parse(evt.data);
+        playSound(notification.source, notification.event);
+        addToHistory(notification);
+        showBrowserNotification(notification);
+      } catch (e) {
+        console.error('[WS] Parse error:', e);
+      }
+    };
+
+    ws.onclose = function () {
+      setConnected(false);
+      scheduleReconnect();
+    };
+
+    ws.onerror = function () {
+      setConnected(false);
+      ws.close();
+    };
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) return;
+    reconnectTimer = setInterval(connectWebSocket, 3000);
+  }
+
+  // ── Init ─────────────────────────────────────────────
+  connectWebSocket();
+})();
+</script>
+</body>
+</html>

@@ -607,6 +607,15 @@
     'cow-mooing', 'fahhhhh', 'phone-vibration', 'rooster'
   ];
 
+  var SYNTH_SOUNDS = [
+    { id: 'synth-claude-complete', label: 'Synth: Claude Complete (880Hz)', source: 'claude-code', event: 'task_complete' },
+    { id: 'synth-claude-input',    label: 'Synth: Claude Input (880Hz)',    source: 'claude-code', event: 'need_input' },
+    { id: 'synth-gemini-complete', label: 'Synth: Gemini Complete (660Hz)', source: 'gemini',      event: 'task_complete' },
+    { id: 'synth-gemini-input',    label: 'Synth: Gemini Input (660Hz)',    source: 'gemini',      event: 'need_input' },
+    { id: 'synth-codex-complete',  label: 'Synth: Codex Complete (440Hz)',  source: 'codex',       event: 'task_complete' },
+    { id: 'synth-codex-input',     label: 'Synth: Codex Input (440Hz)',     source: 'codex',       event: 'need_input' }
+  ];
+
   var SOURCES = ['claude-code', 'gemini', 'codex'];
   var EVENTS = ['task_complete', 'need_input'];
 
@@ -744,10 +753,19 @@
   function playFileSound(name) {
     var cached = audioCache[name];
     if (!cached) return;
-    // Clone so overlapping plays work
     var audio = cached.cloneNode();
     audio.volume = parseFloat(volumeSlider.value);
     audio.play().catch(function () {});
+  }
+
+  function playSynthById(synthId) {
+    var synth = SYNTH_SOUNDS.find(function (s) { return s.id === synthId; });
+    if (!synth) return;
+    if (synth.event === 'task_complete') {
+      playTaskComplete(synth.source);
+    } else {
+      playNeedInput(synth.source);
+    }
   }
 
   function playSound(source, event) {
@@ -755,12 +773,17 @@
     if (!sourceEnabled[source]) return;
 
     var pref = getPreference(source, event);
-    if (pref !== 'synthesized' && audioCache[pref]) {
+    if (pref === 'synthesized') {
+      // Default: use matching synth sound
+      if (event === 'task_complete') {
+        playTaskComplete(source);
+      } else {
+        playNeedInput(source);
+      }
+    } else if (pref.startsWith('synth-')) {
+      playSynthById(pref);
+    } else if (audioCache[pref]) {
       playFileSound(pref);
-    } else if (event === 'task_complete') {
-      playTaskComplete(source);
-    } else if (event === 'need_input') {
-      playNeedInput(source);
     }
   }
 
@@ -957,16 +980,35 @@
 
         var select = document.createElement('select');
         select.dataset.key = key;
-        var synthOpt = document.createElement('option');
-        synthOpt.value = 'synthesized';
-        synthOpt.textContent = 'Synthesized (default)';
-        select.appendChild(synthOpt);
+
+        // Default option
+        var defaultOpt = document.createElement('option');
+        defaultOpt.value = 'synthesized';
+        defaultOpt.textContent = 'Default (auto match)';
+        select.appendChild(defaultOpt);
+
+        // Synthesized sounds group
+        var synthGroup = document.createElement('optgroup');
+        synthGroup.label = 'Synthesized Sounds';
+        SYNTH_SOUNDS.forEach(function (s) {
+          var opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.label;
+          synthGroup.appendChild(opt);
+        });
+        select.appendChild(synthGroup);
+
+        // File sounds group
+        var fileGroup = document.createElement('optgroup');
+        fileGroup.label = 'Sound Effects';
         SOUND_FILES.forEach(function (name) {
           var opt = document.createElement('option');
           opt.value = name;
           opt.textContent = name;
-          select.appendChild(opt);
+          fileGroup.appendChild(opt);
         });
+        select.appendChild(fileGroup);
+
         select.value = soundPreferences[key] || 'synthesized';
 
         select.addEventListener('change', function () {
@@ -981,12 +1023,13 @@
         previewBtn.addEventListener('click', function () {
           var val = select.value;
           if (val === 'synthesized') {
-            // Play synthesized directly, bypassing mute for preview
             if (event === 'task_complete') {
               playTaskComplete(source);
             } else {
               playNeedInput(source);
             }
+          } else if (val.startsWith('synth-')) {
+            playSynthById(val);
           } else {
             playFileSound(val);
           }

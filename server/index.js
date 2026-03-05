@@ -79,7 +79,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`[ai-sound-notify] Server running on http://localhost:${PORT}`);
-  console.log(`[ai-sound-notify] WebSocket available on ws://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[ai-sound-notify] Server running on http://0.0.0.0:${PORT}`);
+  console.log(`[ai-sound-notify] WebSocket available on ws://0.0.0.0:${PORT}`);
 });

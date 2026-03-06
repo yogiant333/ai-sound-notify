@@ -16,11 +16,32 @@ A lightweight sound notification system that plays distinct audio cues in your b
 - **Volume control** - Adjustable volume and per-source mute toggles in the UI
 - **Notification history** - Keeps up to 50 recent notifications visible on the page
 
+## Install as Claude Code Plugin (Recommended)
+
+The easiest way to use AI Sound Notify with Claude Code is via the plugin:
+
+```bash
+# 1. Add the plugin marketplace
+/plugin marketplace add yogiant333/ai-sound-notify
+
+# 2. Install the plugin (via /plugin UI, go to Discover tab)
+/plugin install ai-sound-notify@yogiant333-ai-sound-notify
+
+# 3. Configure your server URL
+/sound-notify-config
+```
+
+The plugin automatically registers hooks for `Stop` and `Notification` events. You just need to tell it your server URL (e.g., `http://localhost:9800` or `https://your-domain.com`).
+
+The server URL is stored in `~/.claude/ai-sound-notify.local.md` and can be changed anytime by running `/sound-notify-config` again.
+
+> **Note:** You still need to deploy the notification server separately (see [Quick Start](#quick-start) below).
+
 ## Quick Start
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/nicepkg/ai-sound-notify.git
+git clone https://github.com/yogiant333/ai-sound-notify.git
 cd ai-sound-notify
 
 # 2. Install dependencies
@@ -327,11 +348,32 @@ AI Sound Notify 是一个轻量级的声音通知系统。当 AI 编程助手（
 - 通过 Web Audio API 合成声音，无需音频文件
 - WebSocket 实时推送，通知即时到达
 
+## 通过 Claude Code 插件安装（推荐）
+
+最简单的 Claude Code 集成方式是安装插件：
+
+```bash
+# 1. 添加插件市场源
+/plugin marketplace add yogiant333/ai-sound-notify
+
+# 2. 安装插件（通过 /plugin 界面，进入 Discover 标签页）
+/plugin install ai-sound-notify@yogiant333-ai-sound-notify
+
+# 3. 配置服务器地址
+/sound-notify-config
+```
+
+插件会自动注册 `Stop` 和 `Notification` 事件的 hooks。你只需输入服务器地址（如 `http://localhost:9800` 或 `https://your-domain.com`）。
+
+服务器地址保存在 `~/.claude/ai-sound-notify.local.md` 中，随时可通过 `/sound-notify-config` 修改。
+
+> **注意：** 通知服务器仍需单独部署（见下方快速开始）。
+
 ## 快速开始
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/nicepkg/ai-sound-notify.git
+git clone https://github.com/yogiant333/ai-sound-notify.git
 cd ai-sound-notify
 
 # 2. 安装依赖
